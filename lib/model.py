@@ -1,5 +1,6 @@
 import torch as torch
 import torch.nn as nn
+import torch.nn.init as init
 
 class TetradNetwork(nn.Module):
     def __init__(self):
@@ -7,33 +8,46 @@ class TetradNetwork(nn.Module):
         L = 32
         self.layer1  = nn.Linear(  4, L )
         self.layer2  = nn.Linear(  L, L )
-        self.layer3  = nn.Linear(  L, L )
+        #self.layer3  = nn.Linear(  L, L )
         self.layer4  = nn.Linear(  L, 16)
+        self._init_weights()
 
     def forward(self, x):
-        A = 1 #amplitude
+        A = 1.0 #amplitude
         
         x0 = torch.clone(x)
         x = self.layer1(x)
         #x = A*torch.exp(-torch.square(x))
-        x =  A*torch.sinc(x)
+        x =  A*torch.cos(x)
         #x = torch.cat( (x,x0), dim=1 )
         
         x = self.layer2(x)
         #x = A*torch.exp(-torch.square(x))
-        x = A*torch.sinc(x)
+        x = A*torch.cos(x)
         #x = torch.cat( (x,x0), dim=1 )
         
-        x = self.layer3(x)
+       # x = self.layer3(x)
         #x = A*torch.tanh(x)
         #x = A*torch.exp(-torch.square(x))
-        x = A*torch.sinc(x)
+        #x = A*torch.sinc(x)
 
         x = self.layer4(x)
         x = torch.reshape(x, [-1,4,4])
         
-        #x = torch.linalg.matrix_exp(x)
         return x
+    
+    def _init_weights(self):
+        # Initialize weights for layer1
+        init.xavier_uniform_(self.layer1.weight)
+        init.constant_(self.layer1.bias, 0.0)
+
+        # Initialize weights for layer2
+        init.xavier_uniform_(self.layer2.weight)
+        init.constant_(self.layer2.bias, 0.0)
+
+        # Initialize weights for layer4
+        init.xavier_uniform_(self.layer4.weight)
+        init.constant_(self.layer4.bias, 0.0)
 
 
 class SchwarzschildTetradNetwork(nn.Module):
@@ -46,33 +60,19 @@ class SchwarzschildTetradNetwork(nn.Module):
 
 
     def forward(self, x):
+        t = x[:,0]
         r = x[:,1]
         th= x[:,2]
+        ph= x[:,3]
 
         N = x.shape[0]
         e = torch.zeros( (N,4,4) )
-        e[:,0,0] =     torch.sqrt( 1-2/r )
-        e[:,1,1] = 1.0/torch.sqrt( 1-2/r )
+
+        #permute Minkwoski indices to test
+        e[:,0,0] =     torch.sqrt( 1.0 - 2.0/r )
+        e[:,1,1] = 1.0/torch.sqrt( 1.0 - 2.0/r )
         e[:,2,2] = r
         e[:,3,3] = r*torch.sin(th)
-        return e
-
-class FlatTetradNetwork(nn.Module):
-    #define a flat spacetime tetrad with nonstandard coordinates
-    #t = t'^3 and so on
-    def __init__(self):
-        super().__init__()
-        L = 32
-        self.layer1  = nn.Linear(  4, L )
-        self.layer2  = nn.Linear(  L, L ) 
-        self.layer3  = nn.Linear(  L, 16)
-
-
-    def forward(self, x):
-        N = x.shape[0]
-        e = torch.zeros( (N,4,4) )
-        for i in range(4):
-            e[:,i,i] = 3*x[:,i]*x[:,i] #from differentiating x^3
         return e
 
 class EinsteinPINN(nn.Module):
@@ -81,80 +81,83 @@ class EinsteinPINN(nn.Module):
         self.tetradnetwork = tetradnetwork        
         
     def forward(self, x):
-        e = self.tetradnetwork(x) #evaluate the tetradfunction
+        '''
+        PURPOSE:
+        Evaluate the Ricci curvature defined by a tetrad.
+
+        DETAILS:
+        I am going to attempt use einsum and only einsum where possible for maximal readability.
+        I will use the convention of Greek indices \mu,\nu for spatial tangent space DOF and capital Latin IJ 
+        for Minkowski indices. For einsum, we need single letter indices, so have \mu and \nu correspond to m, n. 
+        '''
+
+        # Step 1: evaluate trivial functions of tetrad e_{\mu I}
+        e     = self.tetradnetwork(x)     #evaluate the tetradfunction e_{\mu I}
+        de    = self.tetrad_gradient(e,x) #take the partial derivatives of tetrad components
+        e_inv = torch.inverse( e ) #e_{\mu I} -> e^{I \mu}
+        e_inv = torch.einsum( "bIm->bmI", e_inv ) #Switch index order to e^{\mu I}, same order as e_{\mu I}
+        minko = torch.diag( torch.tensor([-1.0, 1.0, 1.0, 1.0]) ) #Minkowski metric
+        e_mat = torch.einsum( 'bmJ,IJ->bmI', e_inv, minko ) # e^\mu_I (inverse with Mink index lowered)
+
+        # Step 2: compute the connection one-forms
+        rotation = torch.einsum( "bmI,bnJ,bmnK->bIJK", e_mat, e_mat, de ) #psuedo-rotation coefficients (cov derivative replaced w partial)
+        tau      = rotation - torch.einsum( "bIJK->bJIK", rotation ) #antisymmetric in first two indices
         
-        #autodiff the streamfunction
-        #print( e.shape )
-        my_tup = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0] 
+        # For some reason my code works if the construction takes 3 steps
+        # rotation = ( tau + torch.einsum("bIJK->bKJI", tau) + torch.einsum("bIJK->bKIJ", tau0) )/2.0 #compute the true rotation coeffs
+        rotation = torch.einsum("bIJK->bKJI", tau)
+        rotation = rotation + (tau - torch.einsum("bIJK->bIKJ", tau))
+        rotation = rotation/2.0
+        
+        w        = torch.einsum( "bKIJ,bmL,LK->bmIJ", rotation, e, minko ) #w_{\mu IJ}
+        w2       = torch.einsum( "bmIK,KJ->bmIJ", w, minko ) # w_{\mu I}^J
+
+        #Optionally check the equations of structure to see if our one-form agrees with Wald
+        wald_1, wald_2 = self.check_wald( de, e, w2 )
+
+        #Step 3: Riemann curvature and Ricci curvature
+        dw2     = self.connection_gradient( w2, x ) # \partial_\mu w_{\nu I}^J
+        riemann = dw2 + torch.einsum( "bmik,bnkj->bmnij", w2, w2 ) #R_{\mu\nu I}^J (before symm)
+        riemann = riemann - torch.einsum( "bmnIJ->bnmIJ", riemann) #R_{\mu\nu I}^J
+        ricci   = torch.einsum( "bmnij,bnj->bmi", riemann, e_mat ) #R_{\mu I} = R_{\mu\nu I}^J e^\nu_J
+        ricci   = torch.einsum( "bmj,bmi->bij", ricci, e_mat)      #R_{IJ} = R_{\mu J} e^\mu_I
+
+        #Might as well cast the Riemann tensor full in Minkwoski space, fully covariant
+        riemann = torch.einsum( "bmnIJ,bmK,bnL,JM->bKLIM", riemann, e_mat, e_mat, minko)
+
+        return ricci, riemann, wald_1, wald_2, w
+    
+    def tetrad_gradient(self, e, x ):
+        my_tup = [0] * 4 * 4 
         for i in range(4):
             for j in range(4):
                 my_tup[4*i+j] = torch.autograd.grad( e[:,i,j], x, grad_outputs=torch.ones_like(e[:,i,j]), create_graph=True, allow_unused=True )[0]
         
         de = torch.cat( my_tup, dim=-1 )
         de = torch.reshape( de, [-1, 4, 4, 4] )
-        #Assume the index order is [N \nu I \mu] of \partial_\mu e_{\nu I}
-        #I hate this, so we should permute the indices
+        #Move the partial derivative index from the back to the front
+        de = torch.einsum( "bnIm->bmnI", de ) 
+        return de
 
-        de = torch.permute( de, [0,3,1,2] ) 
-
-        #Note taking the inverse will inadavertently change the order of indices to [N, I, \mu]
-        e_inv = torch.inverse( e )
-        e_inv = torch.permute( e_inv, [0,2,1] ) #Now it is [N, \mu ,I], just like e before inversion
-        
-        #define the Minkowski metric of size [4,4]
-        minkowski = torch.diag( torch.tensor([-1.0, 1.0, 1.0, 1.0]) ) 
-
-        #Lower the Mink index of inverse: e^\mu_I = e^{\mu J} \eta_{JI}
-        e_inv0 = torch.clone(e_inv)
-        e_inv  = torch.einsum( 'bmj,ji->bmi', e_inv, minkowski )
-
-        # define psuedo-one-form pw_{\mu I J} = e^\nu_I \partial_\mu e_{\nu J} 
-        pw = torch.einsum( "bni,bmnj->bmij", e_inv, de )
-        
-        #compute psuedo-rotation coefficients pr_{KIJ} = e^\mu_K pw_{\mu IJ}
-        pr = torch.einsum( "bmij,bmk->bkij", pw, e_inv )
-
-        #antisymmetrize tau <- pr_{KIJ} - pr_{IKJ} = same with r instead of pr
-        tau = pr - torch.permute(pr, [0,2,1,3])
-
-        #compute the Ricci rotation coefficients r_{IJK}
-        r = (tau + torch.permute( tau, [0,3,2,1] ) + torch.permute( tau, [0,3,1,2] ))/2
-
-        #Take the first index back to cotangent space
-        r = torch.einsum( "bljk,li->bijk", r, minkowski ) #raise first index r^I_{JK}
-        w = torch.einsum( "bijk,bmi->bmjk", r, e ) #apply e_{\mu I} r^I{}_{JK}
-
+    def connection_gradient(self, w2, x ):
         #Compute derivatives of connection one-forms
         my_tup = [0] * 4 * 4 * 4
         for i in range(4):
             for j in range(4):
                 for k in range(4):
-                    my_tup[ 4*4*i + 4*j + k ] = torch.autograd.grad( w[:,i,j,k], x, grad_outputs=torch.ones_like(w[:,i,j,k]), create_graph=True, allow_unused=True )[0]     
-        dw = torch.cat( my_tup, dim=-1 )
-        dw = torch.reshape( dw, [-1, 4, 4, 4, 4] )
-        # Assume we need to do the same thing as before the bring the partial derivative to the front
-        dw = torch.permute( dw, [0,4,1,2,3] ) #{N, \mu, \nu ,I ,J} of \partial_\mu w_{\nu I J}
+                    my_tup[ 4*4*i + 4*j + k ] = torch.autograd.grad( w2[:,i,j,k], x, grad_outputs=torch.ones_like(w2[:,i,j,k]), create_graph=True, allow_unused=True )[0]     
+        dw2 = torch.cat( my_tup, dim=-1 )
+        dw2 = torch.reshape( dw2, [-1, 4, 4, 4, 4] )
+        dw2 = torch.einsum( "bnIJm->bmnIJ", dw2 ) 
+        return dw2
 
-        #create a connection one-form with last index raised
-        w2 = torch.einsum( "bmik,kj->bmij", w, minkowski ) # w_{\mu I}^J
+    def check_wald(self, de, e, w2):
+        # To check that w is calculated right, let's compute the equations of structure
+        # Wald p 52, eq 3.4.27
+        wald_1 = de
+        wald_2 = torch.einsum( "bmJ,bnIJ->bmnI", e, w2 )
 
-        #compute the Riemann tensor
-        riemann = dw - torch.permute(dw,[0,2,1,3,4]) \
-                     + torch.einsum( "bmik,bnkj->", w2, w ) \
-                     - torch.einsum( "bnik,bmkj->", w2, w )
-        
-        #print( riemann.shape )
-
-        #compute Ricci tensor by tracing with e_inv
-        ricci = torch.einsum( "bmnij,bnj->bmi", riemann, e_inv0 ) # use e^{\mu I}
-
-        #Right now Riemann is in form R_{\mu\nu IJ} and Ricci is R_{\mu I}
-        #Let's put everything in Minkowski space so its magnitude is meaningful
-        ricci = torch.einsum( "bmj,bmi->bij", ricci, e_inv)
-
-        riemann = torch.einsum( "bmnij,bmk->bknij", riemann, e_inv )
-        riemann = torch.einsum( "bknij,bnl->bklij", riemann, e_inv )
-
-        return ricci, riemann
-       
-        
+        #antisymmetrize both
+        wald_1 = wald_1 - torch.einsum( "bmnI->bnmI", wald_1 )
+        wald_2 = wald_2 - torch.einsum( "bmnI->bnmI", wald_2 )
+        return wald_1, wald_2
