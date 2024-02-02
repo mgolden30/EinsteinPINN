@@ -1,15 +1,13 @@
-import numpy as np
 import torch
 
 import torch.optim as optim
 from torch import nn
 from lib.model import TetradNetwork_V1, EinsteinPINN
 import lib.utils as utils
-from scipy.io import savemat
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+from lib.losses import loss_V1
 
-output_folder = "network_output/"
+device = utils.check_for_GPU()
 
 epochs = 32
 learning_rate = 1e-1
@@ -19,33 +17,28 @@ seed = 1
 torch.manual_seed(seed)
 torch.cuda.manual_seed_all(seed)
 
+#pick testing and training data
 N = 1024
 x_train = utils.sample_uniform_cube(N) 
 x_test  = utils.sample_uniform_cube(N) 
 
-loss_history = torch.zeros( (epochs) )
 
+loss_history = torch.zeros( (epochs) )
 tetradnet = torch.load("network_output/tetradnet.pth")
-pinn      = EinsteinPINN(tetradnet).to(device)
 
 criterion = nn.L1Loss()
-optimizer = optim.LBFGS( pinn.parameters(), lr=1e-2)
+optimizer = optim.LBFGS( tetradnet.parameters(), lr=1e-2)
 
 def closure():
     optimizer.zero_grad()  # Clear gradients
-    ricci, riemann, _, _, _ = pinn.forward(x_train)
-    err_einstein = ricci/torch.mean( torch.abs(riemann), dim=(0,1,2,3,4) )
-    
-    err = err_einstein
+    err = loss_V1(tetradnet, x_train)
     loss = criterion(err, torch.zeros_like(err))
     loss.backward(retain_graph=True)   # compute gradients
     return loss
 
 for epoch in range(epochs):
     # Forward pass
-    ricci, riemann, _, _, _ = pinn.forward(x_train)
-    err_einstein = ricci/torch.mean( torch.abs(riemann), dim=(0,1,2,3,4) )
-    err = err_einstein
+    err  =loss_V1( tetradnet, x_train )
 
     # Compute the loss
     loss = criterion(err, torch.zeros_like(err))  # assuming you want to minimize pinn.forward(xs) to zero

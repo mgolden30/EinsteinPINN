@@ -1,7 +1,7 @@
 clear;
 
 %Load your spacetime data of interest
-load("../network_output/tetradnet_test.mat");
+load("../network_output/tetradnet_finetuned_train.mat");
 
 [x,e] = find_linear_transformation(x,e);
 
@@ -41,19 +41,9 @@ squeeze( w1(1,:,:,1)./w2(1,:,:,1) )
 squeeze(ricci(1,:,:))
 
 
-%% Make a good  graphic of curvature distributions
-figure(2);
-clf
-
-histogram( riemann, 128, "Normalization", "countdensity", "EdgeAlpha", 0 );
-hold on
-histogram( ricci, 128, "Normalization", "countdensity", "EdgeAlpha", 0 );
-hold off
-
-legend({"Riemann", "Ricci"});
-
 %% visualize fields with color
 
+figure(2)
 clf
 
 N = size(e, 1);
@@ -63,13 +53,13 @@ for i = 1:N
   g(i,:,:) = e2*diag([-1,1,1,1])*e2';
 end
 
-tl = tiledlayout(4,4)
+tl = tiledlayout(4,4);
 
 for i = 1:4
 for j = 1:4
 nexttile
 ms = 30;
-scatter3( x(:,2), x(:,3), x(:,4), 30, g(:,i,j), 'filled' );
+scatter3( x(:,2), x(:,3), x(:,1), 30, g(:,i,j), 'filled' );
 pbaspect([1 1 1]);
 %colorbar();
 %clim([-1 1]);

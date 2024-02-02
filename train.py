@@ -8,6 +8,7 @@ import torch
 import torch.optim as optim
 from torch import nn
 from lib.model import TetradNetwork_V1, EinsteinPINN
+from lib.losses import loss_basic, loss_V1
 
 import lib.utils as utils
 
@@ -16,7 +17,7 @@ device = utils.check_for_GPU()
 
 #PUT ALL PARAMETERS HERE
 epochs = 64 #number of training steps
-learning_rate = 1e-2
+learning_rate = 1e-3
 num_training  = 1024 #number of training points
 
 #Seed for reproducibility
@@ -39,15 +40,9 @@ optimizer = optim.Adam( pinn.parameters(), lr=learning_rate )
 loss_history = torch.zeros( (epochs) )
 
 for epoch in range(epochs):
-    # Forward pass to compute spacetime curvature
-    ricci, riemann, _, _, _ = pinn.forward(x_train)
+    err = loss_V1( tetradnet, x_train )
 
-    #We want the Ricci tensor to vanish. I am weighting by the Riemann tensor
-    #Both are projected into Minkowski space with the tetrad, so this loss is coordinate invariant
-    #It is NOT gauge invariant though. Local Lorentz transformations of the tetrad will change it.
-    err  = ricci/torch.mean( torch.abs(riemann), dim=(0,1,2,3,4) )
-
-    #turn the output into a loss
+    #turn the error into a loss
     loss = criterion(err, torch.zeros_like(err))
     loss_history[epoch] = loss.detach()
     print(f"Epoch {epoch}/{epochs}, Loss: {loss.item()}")
