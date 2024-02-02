@@ -2,36 +2,28 @@ import torch as torch
 import torch.nn as nn
 import torch.nn.init as init
 
-class TetradNetwork(nn.Module):
+import lib.utils as utils
+
+device = utils.check_for_GPU()
+
+class TetradNetwork_V1(nn.Module):
     def __init__(self):
         super().__init__()
         L = 32
-        self.layer1  = nn.Linear(  4, L )
-        self.layer2  = nn.Linear(  L, L )
-        #self.layer3  = nn.Linear(  L, L )
-        self.layer4  = nn.Linear(  L, 16)
+        self.layer1  = nn.Linear(  4, L ).to(device)
+        self.layer2  = nn.Linear(  L, L ).to(device)
+        self.layer3  = nn.Linear(  L, 16).to(device)
         self._init_weights()
 
     def forward(self, x):
-        A = 1.0 #amplitude
-        
-        x0 = torch.clone(x)
-        x = self.layer1(x)
-        #x = A*torch.exp(-torch.square(x))
-        x =  A*torch.cos(x)
-        #x = torch.cat( (x,x0), dim=1 )
+        #forward pass of the neural network
+        x  = self.layer1(x)
+        x = torch.cos(x)        
         
         x = self.layer2(x)
-        #x = A*torch.exp(-torch.square(x))
-        x = A*torch.cos(x)
-        #x = torch.cat( (x,x0), dim=1 )
-        
-       # x = self.layer3(x)
-        #x = A*torch.tanh(x)
-        #x = A*torch.exp(-torch.square(x))
-        #x = A*torch.sinc(x)
+        x = torch.cos(x)
 
-        x = self.layer4(x)
+        x = self.layer3(x)
         x = torch.reshape(x, [-1,4,4])
         
         return x
@@ -44,20 +36,16 @@ class TetradNetwork(nn.Module):
         # Initialize weights for layer2
         init.xavier_uniform_(self.layer2.weight)
         init.constant_(self.layer2.bias, 0.0)
+        
+        # Initialize weights for layer3
+        init.xavier_uniform_(self.layer3.weight)
+        init.constant_(self.layer3.bias, 0.0)
 
-        # Initialize weights for layer4
-        init.xavier_uniform_(self.layer4.weight)
-        init.constant_(self.layer4.bias, 0.0)
 
 
 class SchwarzschildTetradNetwork(nn.Module):
     def __init__(self):
         super().__init__()
-        L = 32
-        self.layer1  = nn.Linear(  4, L )
-        self.layer2  = nn.Linear(  L, L ) 
-        self.layer3  = nn.Linear(  L, 16)
-
 
     def forward(self, x):
         t = x[:,0]
@@ -66,9 +54,9 @@ class SchwarzschildTetradNetwork(nn.Module):
         ph= x[:,3]
 
         N = x.shape[0]
-        e = torch.zeros( (N,4,4) )
+        e = torch.zeros( (N,4,4) ).to(device)
 
-        #permute Minkwoski indices to test
+        #Standard diagonal tetrad
         e[:,0,0] =     torch.sqrt( 1.0 - 2.0/r )
         e[:,1,1] = 1.0/torch.sqrt( 1.0 - 2.0/r )
         e[:,2,2] = r
@@ -91,12 +79,14 @@ class EinsteinPINN(nn.Module):
         for Minkowski indices. For einsum, we need single letter indices, so have \mu and \nu correspond to m, n. 
         '''
 
+
         # Step 1: evaluate trivial functions of tetrad e_{\mu I}
         e     = self.tetradnetwork(x)     #evaluate the tetradfunction e_{\mu I}
         de    = self.tetrad_gradient(e,x) #take the partial derivatives of tetrad components
         e_inv = torch.inverse( e ) #e_{\mu I} -> e^{I \mu}
         e_inv = torch.einsum( "bIm->bmI", e_inv ) #Switch index order to e^{\mu I}, same order as e_{\mu I}
-        minko = torch.diag( torch.tensor([-1.0, 1.0, 1.0, 1.0]) ) #Minkowski metric
+        minko = torch.diag( torch.tensor([-1.0, 1.0, 1.0, 1.0]) ).to(device) #Minkowski metric
+        
         e_mat = torch.einsum( 'bmJ,IJ->bmI', e_inv, minko ) # e^\mu_I (inverse with Mink index lowered)
 
         # Step 2: compute the connection one-forms
