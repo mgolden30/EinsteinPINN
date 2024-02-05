@@ -35,13 +35,94 @@ class TetradNetwork_V1(nn.Module):
 
         # Initialize weights for layer2
         init.xavier_uniform_(self.layer2.weight)
-        init.constant_(self.layer2.bias, 0.0)
+        init.constant_(self.layer3.bias, 0.0)
         
         # Initialize weights for layer3
         init.xavier_uniform_(self.layer3.weight)
         init.constant_(self.layer3.bias, 0.0)
 
 
+class TetradNetwork_V2(nn.Module):
+    '''
+    PURPOSE:
+    Trigonometric Network (https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=eed78c3d057f9be2587c4f6a5e68956974bb5a26)
+    "Iterative Improvement of Trigonometric Networks"
+    '''
+    def __init__(self):
+        super().__init__()
+        L = 16
+        self.layer1  = nn.Linear(    4,   L ).to(device)
+        self.layer2  = nn.Linear(    2*L, L ).to(device)
+        self.layer3  = nn.Linear(    2*L, 16).to(device)
+        self._init_weights()
+
+    def forward(self, x):
+        #forward pass of the neural network
+        x = self.layer1(x)
+        x = torch.cat( (torch.sin(x), torch.cos(x)), dim=1 )
+        
+        x = self.layer2(x)
+        x = torch.cat( (torch.sin(x), torch.cos(x)), dim=1 )
+        
+        x = self.layer3(x)
+        x = torch.reshape(x, [-1,4,4])
+        
+        return x
+    
+    def _init_weights(self):
+        # Initialize weights for layer1
+        init.xavier_uniform_(self.layer1.weight)
+        init.constant_(self.layer1.bias, 0.0)
+
+        # Initialize weights for layer2
+        init.xavier_uniform_(self.layer2.weight)
+        init.constant_(self.layer3.bias, 0.0)
+        
+        # Initialize weights for layer3
+        init.xavier_uniform_(self.layer3.weight)
+        init.constant_(self.layer3.bias, 0.0)
+ 
+
+class TetradNetwork_V3(nn.Module):
+    '''
+    PURPOSE:
+    Trigonometric Network (https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=eed78c3d057f9be2587c4f6a5e68956974bb5a26)
+    "Iterative Improvement of Trigonometric Networks"
+    '''
+    def __init__(self):
+        super().__init__()
+        L = 8 #number of thetas computed each layer
+        self.layer1  = nn.Linear(      4, L ).to(device) 
+        self.layer2  = nn.Linear(    2*L, L ).to(device)
+        self.layer3  = nn.Linear(    4*L, 16).to(device)
+        self._init_weights()
+
+    def forward(self, x):
+        #forward pass of the neural network
+        x = self.layer1(x)
+        x = torch.cat( (torch.sin(x), torch.cos(x)), dim=1 )
+        
+        x0 = x.clone()
+        x = self.layer2(x)
+        x = torch.cat( (x0, torch.sin(x), torch.cos(x)), dim=1 )
+
+        x = self.layer3(x)
+        x = torch.reshape(x, [-1,4,4])
+        
+        return x
+    
+    def _init_weights(self):
+        # Initialize weights for layer1
+        init.xavier_uniform_(self.layer1.weight)
+        init.constant_(self.layer1.bias, 0.0)
+
+        # Initialize weights for layer2
+        init.constant_(self.layer2.weight, 0.0)
+        init.constant_(self.layer3.bias, 0.0)
+        
+        # Initialize weights for layer3
+        init.xavier_uniform_(self.layer3.weight)
+        init.constant_(self.layer3.bias, 0.0)
 
 class SchwarzschildTetradNetwork(nn.Module):
     def __init__(self):

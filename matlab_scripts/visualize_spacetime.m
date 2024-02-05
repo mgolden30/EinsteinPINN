@@ -1,7 +1,7 @@
 clear;
 
 %Load your spacetime data of interest
-load("../network_output/tetradnet_finetuned_train.mat");
+load("../network_output/tetradnet_train.mat");
 
 [x,e] = find_linear_transformation(x,e);
 
@@ -21,6 +21,7 @@ cond_e = zeros();
 for i = 1:N
   cond_e(i) = cond(squeeze(e(i,:,:)));
 end
+
 semilogy(1:N, cond_e);
 title('cond_e');
 
@@ -29,17 +30,21 @@ histogram(e)
 title('e');
 
 nexttile
-histogram(ricci)
+
+ricci_scale = max(max(max(abs(ricci))));
+nbins = 64;
+
+histogram(ricci, nbins, "BinEdges", linspace(-ricci_scale, ricci_scale, nbins) )
 title('ricci');
 
 nexttile
-riemann( abs(riemann) < 1e-5) = nan; %get rid of pointless exact zeros
-histogram(riemann)
+riemann( abs(riemann) < 1e-4) = nan; %get rid of pointless exact zeros
+histogram(riemann, nbins, "BinEdges", 5*linspace(-ricci_scale, ricci_scale, nbins) )
 title('riemann');
 
 squeeze( w1(1,:,:,1)./w2(1,:,:,1) )
 squeeze(ricci(1,:,:))
-
+return
 
 %% visualize fields with color
 

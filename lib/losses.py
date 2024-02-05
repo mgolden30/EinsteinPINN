@@ -5,6 +5,8 @@ Here we can compile many different useful loss functions with different penaltie
 import torch
 from lib.model import EinsteinPINN
 
+
+
 def loss_basic( tetradnet, x ):
     #This is the most basic loss function I can think of. 
     #Set L equal to the mean(abs(ricci)) and divide by the mean(abs(riemann)) to encourage it to find some curvature 
@@ -16,7 +18,6 @@ def loss_basic( tetradnet, x ):
     err  = ricci/torch.mean( torch.abs(riemann), dim=(0,1,2,3,4) )
 
     return err
-
 
 
 def loss_V1( tetradnet, x ):
@@ -34,4 +35,16 @@ def loss_V1( tetradnet, x ):
     #stack into a single error
     err = torch.cat( (err1, err2), dim=1 )
 
+    return err
+
+
+def loss_V2( tetradnet, x ):
+    pinn = EinsteinPINN(tetradnet)
+
+    # Forward pass to compute spacetime curvature
+    ricci, riemann, _, _, _ = pinn.forward(x)
+    
+    #Instead of a direct ratio, multiply by 1 + 1/Riemann
+    regularization = 1.0 + 1.0/torch.mean( torch.abs(riemann), dim=(0,1,2,3,4) ) 
+    err = ricci * regularization
     return err

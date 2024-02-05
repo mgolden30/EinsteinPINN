@@ -9,19 +9,18 @@ from lib.losses import loss_V1
 
 device = utils.check_for_GPU()
 
-epochs = 32
+epochs = 16
 learning_rate = 1e-1
+num_training = 1024
 
 #For reproducibility
 seed = 1
 torch.manual_seed(seed)
 torch.cuda.manual_seed_all(seed)
 
-#pick testing and training data
-N = 1024
-x_train = utils.sample_uniform_cube(N) 
-x_test  = utils.sample_uniform_cube(N) 
-
+#Pick training data
+x_train = utils.sample_uniform_cube( num_training ) #sample from [-1,1]^4
+x_test  = utils.sample_uniform_cube( num_training ) #sample from [-1,1]^4
 
 loss_history = torch.zeros( (epochs) )
 tetradnet = torch.load("network_output/tetradnet.pth")
