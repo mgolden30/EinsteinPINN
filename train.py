@@ -7,10 +7,9 @@ import torch
 
 import torch.optim as optim
 from torch import nn
-from lib.model import TetradNetwork_V3, EinsteinPINN
+from lib.model import TetradNetwork_V1, EinsteinPINN
 from lib.losses import loss_V2, loss_V1, loss_basic
 import lib.utils as utils
-
 
 device = utils.check_for_GPU()
 
@@ -29,7 +28,7 @@ x_train = utils.sample_uniform_cube( num_training ) #sample from [-1,1]^4
 x_test  = utils.sample_uniform_cube( num_training ) #sample from [-1,1]^4
 
 #Create a new network for computing a random tetrad
-tetradnet = TetradNetwork_V3().to(device)
+tetradnet = TetradNetwork_V1().to(device)
 #tetradnet = torch.load("network_output/tetradnet.pth")
 
 #define loss scaling and the optimizer of interest
@@ -39,7 +38,7 @@ optimizer = optim.Adam( tetradnet.parameters(), lr=learning_rate )
 loss_history = torch.zeros( (epochs) )
 
 for epoch in range(epochs):
-    err = loss_V1( tetradnet, x_train )
+    err = loss_basic( tetradnet, x_train )
 
     #turn the error into a loss
     loss = criterion(err, torch.zeros_like(err))

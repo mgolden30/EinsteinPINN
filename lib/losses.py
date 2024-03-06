@@ -15,8 +15,11 @@ def loss_basic( tetradnet, x ):
     # Forward pass to compute spacetime curvature
     ricci, riemann, _, _, _ = pinn.forward(x)
 
-    err  = ricci/torch.mean( torch.abs(riemann), dim=(0,1,2,3,4) )
-
+    #compute the mean abs(Riemannian curvature)
+    mean_Riemann = torch.mean( torch.abs(riemann), dim=(1,2,3,4) )
+    mean_Ricci   = torch.mean( torch.abs(ricci),   dim=(1,2) )
+    #add two costs: one for Ricci = 0 and one for <|Riemann|> = 1 so we get non-flat spacetime
+    err   = mean_Ricci/mean_Riemann
     return err
 
 

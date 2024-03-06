@@ -1,8 +1,13 @@
+%{
+This MATLAB script aims to visualize the output of a neural network trying
+to solve the Einstein Field Equations.
+%}
+
+
+
 clear;
-
-%Load your spacetime data of interest
 load("../network_output/tetradnet_train.mat");
-
+%load("../network_output/tetradnet_finetuned_train.mat");
 [x,e] = find_linear_transformation(x,e);
 
 %% statistics
@@ -64,7 +69,7 @@ for i = 1:4
 for j = 1:4
 nexttile
 ms = 30;
-scatter3( x(:,2), x(:,3), x(:,1), 30, g(:,i,j), 'filled' );
+scatter3( x(:,2), x(:,3), x(:,4), 30, g(:,i,j), 'filled' );
 pbaspect([1 1 1]);
 %colorbar();
 %clim([-1 1]);
@@ -91,9 +96,11 @@ set( tl, "TileSpacing", "compact" );
 
 
 function [x,e] = find_linear_transformation(x,e)
-
-%Find a good coordinate transformation
-
+  %{
+  PURPOSE:
+  General Relativity is Diffeomorphism invariant. Coordinates are
+  arbitrary. This script aims to 
+  %}
 N = size(e, 1);
 g = zeros(N, 4, 4);
 for i = 1:N

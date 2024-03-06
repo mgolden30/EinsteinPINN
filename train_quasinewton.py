@@ -5,7 +5,7 @@ from torch import nn
 from lib.model import TetradNetwork_V1, EinsteinPINN
 import lib.utils as utils
 
-from lib.losses import loss_V1
+from lib.losses import loss_V1, loss_basic
 
 device = utils.check_for_GPU()
 
@@ -30,14 +30,14 @@ optimizer = optim.LBFGS( tetradnet.parameters(), lr=1e-2)
 
 def closure():
     optimizer.zero_grad()  # Clear gradients
-    err = loss_V1(tetradnet, x_train)
+    err = loss_basic(tetradnet, x_train)
     loss = criterion(err, torch.zeros_like(err))
     loss.backward(retain_graph=True)   # compute gradients
     return loss
 
 for epoch in range(epochs):
     # Forward pass
-    err  =loss_V1( tetradnet, x_train )
+    err  = loss_basic( tetradnet, x_train )
 
     # Compute the loss
     loss = criterion(err, torch.zeros_like(err))  # assuming you want to minimize pinn.forward(xs) to zero
@@ -52,6 +52,8 @@ for epoch in range(epochs):
     if epoch % 1 == 0:
         #save_network_output( hydro_model, "torch_output_newton_%d.mat" % (epoch) )
         print(f"Epoch {epoch}/{epochs}, Loss: {loss.item()}")
+        output_filename = "./network_output/tetradnet_finetuned" #utils.save_network will add file extensions for the appropriate output files.
+        utils.save_network( tetradnet, x_train, x_test, loss_history, output_filename )
 
 output_filename = "./network_output/tetradnet_finetuned" #utils.save_network will add file extensions for the appropriate output files.
 utils.save_network( tetradnet, x_train, x_test, loss_history, output_filename )

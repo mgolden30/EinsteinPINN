@@ -9,7 +9,7 @@ device = utils.check_for_GPU()
 class TetradNetwork_V1(nn.Module):
     def __init__(self):
         super().__init__()
-        L = 32
+        L = 64
         self.layer1  = nn.Linear(  4, L ).to(device)
         self.layer2  = nn.Linear(  L, L ).to(device)
         self.layer3  = nn.Linear(  L, 16).to(device)
@@ -18,10 +18,10 @@ class TetradNetwork_V1(nn.Module):
     def forward(self, x):
         #forward pass of the neural network
         x  = self.layer1(x)
-        x = torch.cos(x)        
+        x = torch.exp( - torch.square(x) )
         
         x = self.layer2(x)
-        x = torch.cos(x)
+        x = torch.exp( - torch.square(x) )
 
         x = self.layer3(x)
         x = torch.reshape(x, [-1,4,4])
