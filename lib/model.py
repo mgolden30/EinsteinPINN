@@ -6,40 +6,42 @@ import lib.utils as utils
 
 device = utils.check_for_GPU()
 
+
+
+
 class TetradNetwork_V1(nn.Module):
-    def __init__(self):
+    def __init__(self, num_layers, feature_size):
+        '''
+        Create a network that goes from 4 -> L -> L -> ... -> L -> 16, where L is the feature_size and there are num_layers number of layers.
+        '''
+
         super().__init__()
-        L = 64
-        self.layer1  = nn.Linear(  4, L ).to(device)
-        self.layer2  = nn.Linear(  L, L ).to(device)
-        self.layer3  = nn.Linear(  L, 16).to(device)
+        
+        self.layer1 = nn.Linear(4, feature_size).to(device)
+        self.hidden_layers = nn.ModuleList([nn.Linear(feature_size, feature_size).to(device) for _ in range(num_layers)])
+        self.layer_out = nn.Linear(feature_size, 16).to(device)
+        
         self._init_weights()
 
     def forward(self, x):
-        #forward pass of the neural network
-        x  = self.layer1(x)
-        x = torch.exp( - torch.square(x) )
-        
-        x = self.layer2(x)
-        x = torch.exp( - torch.square(x) )
-
-        x = self.layer3(x)
-        x = torch.reshape(x, [-1,4,4])
-        
+        x = self.layer1(x)
+        for layer in self.hidden_layers:
+            x = layer(x) #apply linear layer
+            x = torch.cos(x) #activation function
+            #x = torch.exp( - torch.square(x) )
+        x = self.layer_out(x)
+        #reshape to 4x4 matrices
+        x = torch.reshape( x, [-1, 4, 4] )
         return x
-    
-    def _init_weights(self):
-        # Initialize weights for layer1
-        init.xavier_uniform_(self.layer1.weight)
-        init.constant_(self.layer1.bias, 0.0)
 
-        # Initialize weights for layer2
-        init.xavier_uniform_(self.layer2.weight)
-        init.constant_(self.layer3.bias, 0.0)
-        
-        # Initialize weights for layer3
-        init.xavier_uniform_(self.layer3.weight)
-        init.constant_(self.layer3.bias, 0.0)
+    def _init_weights(self):
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.xavier_uniform_(module.weight)
+                nn.init.zeros_(module.bias)
+
+
+
 
 
 class TetradNetwork_V2(nn.Module):

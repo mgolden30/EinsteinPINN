@@ -14,9 +14,13 @@ import lib.utils as utils
 device = utils.check_for_GPU()
 
 #PUT ALL PARAMETERS HERE
-epochs = 64 #number of training steps
+epochs = 64*3 #number of training steps
 learning_rate = 1e-2
 num_training  = 1024 #number of training points
+
+#architecture parameters
+num_layers = 2
+feature_size = 32
 
 #Seed for reproducibility
 seed = 1
@@ -28,7 +32,7 @@ x_train = utils.sample_uniform_cube( num_training ) #sample from [-1,1]^4
 x_test  = utils.sample_uniform_cube( num_training ) #sample from [-1,1]^4
 
 #Create a new network for computing a random tetrad
-tetradnet = TetradNetwork_V1().to(device)
+tetradnet = TetradNetwork_V1(num_layers, feature_size).to(device)
 #tetradnet = torch.load("network_output/tetradnet.pth")
 
 #define loss scaling and the optimizer of interest
@@ -52,7 +56,7 @@ for epoch in range(epochs):
 
     #Reduce learning rate every so often if you want
     if( (epoch % 64 == 0) & (epoch > 0) ):
-        learning_rate = learning_rate/2
+        learning_rate = learning_rate/10
         optimizer = optim.Adam( tetradnet.parameters(), lr=learning_rate )
 
 #save everything out

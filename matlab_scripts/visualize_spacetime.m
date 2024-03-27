@@ -3,29 +3,48 @@ This MATLAB script aims to visualize the output of a neural network trying
 to solve the Einstein Field Equations.
 %}
 
-
+%change this to your personal export_fig download
+addpath("C:\Users\wowne\Downloads\export_fig\");
 
 clear;
-load("../network_output/tetradnet_train.mat");
-%load("../network_output/tetradnet_finetuned_train.mat");
-[x,e] = find_linear_transformation(x,e);
+load("../network_output/tetradnet_test.mat");
+%load("../network_output/tetradnet_finetuned_test.mat");
 
-%% statistics
+%% Look at the loss history
 figure(1);
+clf;
 
-tiledlayout(2,2);
+semilogy( 1:numel(loss), loss, "linewidth", 3, "color", "black" );
+xlabel("epoch", 'interpreter', 'latex');
+ylabel("$\mathcal{L}_{\textrm{Einstein}}$", 'interpreter', 'latex');
+xticks([ 64 ,128,64*3])
+xline([64, 128], 'linestyle', '--', 'color', [1,1,1]/2, "linewidth", 3 );
+xlim([1, 3*64]);
+set(gcf, "color", "w");
+set(gca, "fontsize", 12);
 
+export_fig('figures/loss_history.pdf', '-pdf', '-nocrop', gcf);
+
+%% Histogram of Ricci
+clf
+num_bins = 64;
+plot_histogram_no_edges(ricci, num_bins)
+set(gcf, "color", "w");
+export_fig('figures/ricci_histogram.pdf', '-dpdf', '-nocrop', gcf);
+
+
+%% Histogram of Riemann
+clf
+num_bins = 64;
+riemann2 = riemann(:);
+riemann2( abs(riemann2) < 1e-5) = []; %delete values that are zero by symmetry
+plot_histogram_no_edges(riemann2, num_bins)
+set(gcf, "color", "w");
+export_fig('figures/riemann_histogram.pdf', '-dpdf', '-nocrop', gcf);
+
+
+%%
 nexttile
-histogram(x);
-title('x');
-
-nexttile
-%%{
-N = size(e,1);
-cond_e = zeros();
-for i = 1:N
-  cond_e(i) = cond(squeeze(e(i,:,:)));
-end
 
 semilogy(1:N, cond_e);
 title('cond_e');
@@ -44,12 +63,15 @@ title('ricci');
 
 nexttile
 riemann( abs(riemann) < 1e-4) = nan; %get rid of pointless exact zeros
-histogram(riemann, nbins, "BinEdges", 5*linspace(-ricci_scale, ricci_scale, nbins) )
+histogram(riemann, nbins, "BinEdges", 10*linspace(-ricci_scale, ricci_scale, nbins) )
 title('riemann');
 
 squeeze( w1(1,:,:,1)./w2(1,:,:,1) )
 squeeze(ricci(1,:,:))
 return
+
+%%
+[x,e] = find_linear_transformation(x,e);
 
 %% visualize fields with color
 
@@ -69,7 +91,7 @@ for i = 1:4
 for j = 1:4
 nexttile
 ms = 30;
-scatter3( x(:,2), x(:,3), x(:,4), 30, g(:,i,j), 'filled' );
+scatter3( x(:,2), x(:,3), x(:,4), 30, e(:,i,j), 'filled' );
 pbaspect([1 1 1]);
 %colorbar();
 %clim([-1 1]);
@@ -80,7 +102,7 @@ xticks([-1 1]);
 yticks(xticks);
 zticks(xticks);
 %title( ("g_{" + (i-1)) + (j-1) + "}" );
-clim([-1 1]);
+clim([-2 2]);
 colorbar()
 colormap bluewhitered
 title(tl, "metric components $g_{\mu\nu}$", "interpreter", "latex", "fontsize", 30);
