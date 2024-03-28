@@ -55,3 +55,23 @@ def loss_V2( tetradnet, x ):
     regularization = 1.0 + 1.0/torch.mean( torch.abs(riemann), dim=(0,1,2,3,4) ) 
     err = ricci * regularization
     return err
+
+def loss_black_hole( tetradnet, x, schwarzschildnet, x0 ):
+    '''
+    PURPOSE:
+    Construct a physics-informed loss for single black hole data
+    '''
+
+    #Check if the EFEs hold
+    err1 = loss_basic( tetradnet, x )
+
+    #Check if we reproduce a Schwarzschild tetrad at t=0
+    e0        = tetradnet.forward(x0)
+    e0_target = schwarzschildnet.forward(x0)
+    err2      = torch.abs(e0 - e0_target)
+
+    err1 = torch.reshape( err1, [-1] )
+    err2 = torch.reshape( err2, [-1] )
+    #stack into a single error
+    err = torch.cat( (err1, err2), dim=0 )
+    return err

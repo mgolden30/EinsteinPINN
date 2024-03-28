@@ -18,11 +18,43 @@ def sample_uniform_cube(N):
     return x
 
 
-def sample_normal_dist(N):
+def sample_normal_dist(N, std):
     device = check_for_GPU()
-    x = torch.empty( (N,4) ).normal_(mean=0,std=1).to(device)
+    x = torch.empty( (N,4) ).normal_(mean=0,std=std).to(device)
     x.requires_grad = True
     return x
+
+
+def sample_black_holes(N, t_max, r_min, r_max, pos):
+    '''
+    PURPOSE: Generate data (t,x,y,z) within a uniform sphere with a hole cut out
+    '''
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    # Uniformly sample a sphere with a hole cut out
+    t = torch.rand((N, 1)) * t_max  # [0, t_max]
+    r = torch.rand((N, 1)) * r_max
+    cos_th = 2 * torch.rand((N, 1)) - 1
+    phi = 2 * torch.pi * torch.rand((N, 1))
+
+    sin_th = torch.sqrt(1 - cos_th ** 2)
+
+    x = r * sin_th * torch.cos(phi)
+    y = r * sin_th * torch.sin(phi)
+    z = r * cos_th
+
+    # Combine these to get (N,4) spacetime training points
+    points = torch.cat((t, x, y, z), dim=1).to(device)
+    
+    # Remove points too close to black holes
+    for bh_pos in pos:
+        dist = torch.norm(points[:, 1:] - bh_pos, dim=1)  # Compute distance to each black hole
+        mask = dist >= r_min  # Mask points that are outside the cutoff radius
+        points = points[mask]
+
+    points.requires_grad = True
+    return points
 
 
 

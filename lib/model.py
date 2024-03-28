@@ -126,6 +126,8 @@ class TetradNetwork_V3(nn.Module):
         init.xavier_uniform_(self.layer3.weight)
         init.constant_(self.layer3.bias, 0.0)
 
+
+
 class SchwarzschildTetradNetwork(nn.Module):
     def __init__(self):
         super().__init__()
@@ -145,6 +147,31 @@ class SchwarzschildTetradNetwork(nn.Module):
         e[:,2,2] = r
         e[:,3,3] = r*torch.sin(th)
         return e
+
+class MultiBlackHoleNetwork(nn.Module):
+    def __init__(self, pos):
+        super().__init__()
+        self.pos = pos
+
+    def forward(self, x):
+        N = x.shape[0]
+        e = torch.zeros( (N,4,4) ).to(device)
+
+        M = 1.0 #masses of all black holes taken to be unity
+        psi = 1 # psi = 1 + sum(M/2r)
+        for bh_pos in self.pos:
+            r = torch.norm( x[:, 1:] - bh_pos, dim=1)  # Compute distance to each black hole
+            psi = psi + M/2/r
+
+        #See if a different slicing induces dynamics
+        e[:,0,0] = 1 #(M-2*r)/(M+2*r)
+        e[:,1,1] = torch.square(psi)
+        e[:,2,2] = torch.square(psi)
+        e[:,3,3] = torch.square(psi)
+        return e
+
+
+
 
 class EinsteinPINN(nn.Module):
     def __init__(self, tetradnetwork):

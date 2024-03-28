@@ -10,7 +10,7 @@ function plot_histogram_no_edges(data, num_bins)
     bin_edges = linspace(mu - 3*sigma, mu + 3*sigma, num_bins+1);
 
     % Create a histogram without bin edges
-    histogram(data_flattened, 'BinEdges', bin_edges, 'EdgeColor', 'none');
+    histogram(data_flattened, 'BinEdges', bin_edges, 'EdgeColor', 'none', 'FaceAlpha', 1);
 
     xlabel('Value');
     ylabel('Frequency');

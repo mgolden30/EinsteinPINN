@@ -7,7 +7,7 @@ to solve the Einstein Field Equations.
 addpath("C:\Users\wowne\Downloads\export_fig\");
 
 clear;
-load("../network_output/tetradnet_test.mat");
+load("../network_output/tetradnet_normal_test.mat");
 %load("../network_output/tetradnet_finetuned_test.mat");
 
 %% Look at the loss history
@@ -43,77 +43,19 @@ set(gcf, "color", "w");
 export_fig('figures/riemann_histogram.pdf', '-dpdf', '-nocrop', gcf);
 
 
-%%
-nexttile
+%% Transform coordinates linearly
 
-semilogy(1:N, cond_e);
-title('cond_e');
+%[x,e] = find_linear_transformation(x,e);
+
+%% Plot the metric in pseudo-Minkowski coordinates
+
+plot_metric_field( x, e );
+set(gcf, "color", "w");
+export_fig('figures/metric.pdf', '-dpdf', '-nocrop', gcf);
 
 
-histogram(e)
-title('e');
 
-nexttile
 
-ricci_scale = max(max(max(abs(ricci))));
-nbins = 64;
-
-histogram(ricci, nbins, "BinEdges", linspace(-ricci_scale, ricci_scale, nbins) )
-title('ricci');
-
-nexttile
-riemann( abs(riemann) < 1e-4) = nan; %get rid of pointless exact zeros
-histogram(riemann, nbins, "BinEdges", 10*linspace(-ricci_scale, ricci_scale, nbins) )
-title('riemann');
-
-squeeze( w1(1,:,:,1)./w2(1,:,:,1) )
-squeeze(ricci(1,:,:))
-return
-
-%%
-[x,e] = find_linear_transformation(x,e);
-
-%% visualize fields with color
-
-figure(2)
-clf
-
-N = size(e, 1);
-g = zeros(N, 4, 4);
-for i = 1:N
-  e2 = squeeze( e(i,:,:) );
-  g(i,:,:) = e2*diag([-1,1,1,1])*e2';
-end
-
-tl = tiledlayout(4,4);
-
-for i = 1:4
-for j = 1:4
-nexttile
-ms = 30;
-scatter3( x(:,2), x(:,3), x(:,4), 30, e(:,i,j), 'filled' );
-pbaspect([1 1 1]);
-%colorbar();
-%clim([-1 1]);
-xlabel("x^1", "rotation", 0);
-ylabel("x^2", "rotation", 0);
-zlabel("x^3", "rotation", 0);
-xticks([-1 1]);
-yticks(xticks);
-zticks(xticks);
-%title( ("g_{" + (i-1)) + (j-1) + "}" );
-clim([-2 2]);
-colorbar()
-colormap bluewhitered
-title(tl, "metric components $g_{\mu\nu}$", "interpreter", "latex", "fontsize", 30);
-set(gcf, 'color', 'w');
-drawnow
-%saveas(gcf, ""+i+""+j+".png");
-end
-end
-
-set( tl, "Padding", "compact" );
-set( tl, "TileSpacing", "compact" );
 
 
 
@@ -154,4 +96,53 @@ N = size(e,1);
 for i = 1:N
   e(i,:,:) = V2\squeeze(e(i,:,:));
 end
+end
+
+
+
+
+function plot_metric_field( x, e )
+
+N = size(e, 1);
+g = zeros(N, 4, 4);
+for i = 1:N
+  e2 = squeeze( e(i,:,:) );
+  g(i,:,:) = e2*diag([-1,1,1,1])*e2';
+end
+
+tl = tiledlayout(4,4);
+
+for i = 1:4
+for j = 1:4
+nexttile
+ms = 30;
+%eta =diag([-1,1,1,1]);
+scatter3( x(:,2), x(:,3), x(:,4), ms, g(:,i,j), 'filled' );
+
+%determine rangge of new coordinates
+tm = max(abs(x(:,1)));
+xm = max(abs(x(:,2)));
+ym = max(abs(x(:,3)));
+zm = max(abs(x(:,4)));
+
+[xm, ym ,zm, tm]
+
+pbaspect([1 1 1]);
+xlabel("x", "rotation", 0);
+ylabel("y", "rotation", 0);
+zlabel("t", "rotation", 0);
+
+clim([-1 1]);
+cb = colorbar();
+set( cb, "xtick", [-1,1]);
+colormap bluewhitered
+%title(tl, "metric components $g_{\mu\nu}$", "interpreter", "latex", "fontsize", 30);
+set(gcf, 'color', 'w');
+drawnow
+end
+end
+
+set( tl, "Padding", "compact" );
+set( tl, "TileSpacing", "compact" );
+
 end
