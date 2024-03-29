@@ -164,7 +164,7 @@ class MultiBlackHoleNetwork(nn.Module):
             psi = psi + M/2/r
 
         #See if a different slicing induces dynamics
-        e[:,0,0] = 1 #(M-2*r)/(M+2*r)
+        e[:,0,0] = 1
         e[:,1,1] = torch.square(psi)
         e[:,2,2] = torch.square(psi)
         e[:,3,3] = torch.square(psi)

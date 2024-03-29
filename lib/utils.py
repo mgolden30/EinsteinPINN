@@ -47,6 +47,7 @@ def sample_black_holes(N, t_max, r_min, r_max, pos):
     # Combine these to get (N,4) spacetime training points
     points = torch.cat((t, x, y, z), dim=1).to(device)
     
+    pos = torch.tensor(pos).to(device)
     # Remove points too close to black holes
     for bh_pos in pos:
         dist = torch.norm(points[:, 1:] - bh_pos, dim=1)  # Compute distance to each black hole

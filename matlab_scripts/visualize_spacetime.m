@@ -7,7 +7,7 @@ to solve the Einstein Field Equations.
 addpath("C:\Users\wowne\Downloads\export_fig\");
 
 clear;
-load("../network_output/tetradnet_normal_test.mat");
+load("../network_output/tetradnet_collision_test.mat");
 %load("../network_output/tetradnet_finetuned_test.mat");
 
 %% Look at the loss history
@@ -23,14 +23,15 @@ xlim([1, 3*64]);
 set(gcf, "color", "w");
 set(gca, "fontsize", 12);
 
-export_fig('figures/loss_history.pdf', '-pdf', '-nocrop', gcf);
+%export_fig('figures/loss_history.pdf', '-pdf', '-nocrop', gcf);
 
 %% Histogram of Ricci
 clf
 num_bins = 64;
 plot_histogram_no_edges(ricci, num_bins)
 set(gcf, "color", "w");
-export_fig('figures/ricci_histogram.pdf', '-dpdf', '-nocrop', gcf);
+
+%export_fig('figures/ricci_histogram.pdf', '-dpdf', '-nocrop', gcf);
 
 
 %% Histogram of Riemann
@@ -40,18 +41,19 @@ riemann2 = riemann(:);
 riemann2( abs(riemann2) < 1e-5) = []; %delete values that are zero by symmetry
 plot_histogram_no_edges(riemann2, num_bins)
 set(gcf, "color", "w");
-export_fig('figures/riemann_histogram.pdf', '-dpdf', '-nocrop', gcf);
+
+%export_fig('figures/riemann_histogram.pdf', '-dpdf', '-nocrop', gcf);
 
 
 %% Transform coordinates linearly
 
-%[x,e] = find_linear_transformation(x,e);
+[x,e] = find_linear_transformation(x,e);
 
 %% Plot the metric in pseudo-Minkowski coordinates
 
 plot_metric_field( x, e );
 set(gcf, "color", "w");
-export_fig('figures/metric.pdf', '-dpdf', '-nocrop', gcf);
+%export_fig('figures/metric.pdf', '-dpdf', '-nocrop', gcf);
 
 
 
@@ -139,6 +141,7 @@ colormap bluewhitered
 %title(tl, "metric components $g_{\mu\nu}$", "interpreter", "latex", "fontsize", 30);
 set(gcf, 'color', 'w');
 drawnow
+
 end
 end
 
