@@ -23,7 +23,7 @@ x_train = utils.sample_uniform_cube( num_training ) #sample from [-1,1]^4
 x_test  = utils.sample_uniform_cube( num_training ) #sample from [-1,1]^4
 
 loss_history = torch.zeros( (epochs) )
-tetradnet = torch.load("network_output/tetradnet.pth")
+tetradnet = torch.load("network_output/tetradnet_binary.pth")
 
 criterion = nn.L1Loss()
 optimizer = optim.LBFGS( tetradnet.parameters(), lr=1e-2)

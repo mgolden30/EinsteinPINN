@@ -66,12 +66,21 @@ def loss_black_hole( tetradnet, x, schwarzschildnet, x0 ):
     err1 = loss_basic( tetradnet, x )
 
     #Check if we reproduce a Schwarzschild tetrad at t=0
+    #x0.requires_gradient = True #so we can take time derivative
+    x0 = torch.tensor(x0, requires_grad=True)
     e0        = tetradnet.forward(x0)
     e0_target = schwarzschildnet.forward(x0)
     err2      = torch.abs(e0 - e0_target)
 
+    #Enforce time derivative of 
+    e0_grad = torch.autograd.grad(e0, x0, grad_outputs=torch.ones_like(e0), create_graph=True)[0]
+    err3 = torch.abs( e0_grad[:, 3] )  # Assuming x0[:,3] corresponds to the variable of interest
+
     err1 = torch.reshape( err1, [-1] )
     err2 = torch.reshape( err2, [-1] )
+    err3 = torch.reshape( err3, [-1] )  
+    
     #stack into a single error
-    err = torch.cat( (err1, err2), dim=0 )
+    err = torch.cat( (err1, err2, err3), dim=0 )
+    
     return err

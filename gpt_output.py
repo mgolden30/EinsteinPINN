@@ -4,18 +4,18 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
 # Load the trained neural network
-tetradnet = torch.load("network_output/tetradnet_collision.pth").to('cpu')
+tetradnet = torch.load("network_output/tetradnet_binary.pth").to('cpu')
 tetradnet.eval()  # Set the network to evaluation mode
 
 # Define parameters for the 2D grid
 r_min = 0.5 #Don't resolve closer than this to the singularity 
-r_max = 10
-t_max = 5
+r_max = 15
+t_max = 10
 
-# Give multiple black hole positions
-pos = np.zeros((2, 3))
-pos[0, :] = [ 2.0, 0.0, 0.0]
-pos[1, :] = [-2.0, 0.0, 0.0]
+#give multiple black hole positions
+pos = np.zeros( (2,3) )
+pos[0,:] = [ 3.0, 0.0, 0.0 ]
+pos[1,:] = [-3.0, 0.0, 0.0 ]
 
 nx = 128
 nt = 32
@@ -63,7 +63,7 @@ def update(t):
         mask = r < r_min
         g[mask, :, :] = np.nan
 
-    this_frame = np.reshape(g[:, 0, 0], [nx, nx])
+    this_frame = np.reshape(g[:, 1, 1], [nx, nx])
     im = ax.imshow(this_frame, cmap='bwr')
     return im,
 

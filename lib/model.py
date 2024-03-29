@@ -45,86 +45,58 @@ class TetradNetwork_V1(nn.Module):
 
 
 class TetradNetwork_V2(nn.Module):
-    '''
-    PURPOSE:
-    Trigonometric Network (https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=eed78c3d057f9be2587c4f6a5e68956974bb5a26)
-    "Iterative Improvement of Trigonometric Networks"
-    '''
-    def __init__(self):
+    def __init__(self, num_layers, feature_size, pos):
+        '''
+        Create a network that goes from (4 + 2*num_bh) -> L -> L -> ... -> L -> 16, 
+        where L is the feature_size and there are num_layers number of layers.
+        '''
+
         super().__init__()
-        L = 16
-        self.layer1  = nn.Linear(    4,   L ).to(device)
-        self.layer2  = nn.Linear(    2*L, L ).to(device)
-        self.layer3  = nn.Linear(    2*L, 16).to(device)
+        
+        self.pos = pos
+
+        #t,x,y,z and r,1/r for each black hole
+        num_bh = pos.shape[0]
+        first_layer_dof = 4 + 2*num_bh
+
+        self.layer1 = nn.Linear( first_layer_dof, feature_size ).to(device)
+        self.hidden_layers = nn.ModuleList([nn.Linear(feature_size, feature_size).to(device) for _ in range(num_layers)])
+        self.layer_out = nn.Linear(feature_size, 16).to(device)
+        
         self._init_weights()
 
     def forward(self, x):
-        #forward pass of the neural network
+        #compute radial distance to black holes
+        pos = torch.reshape( self.pos, [1,-1,3] )
+        x   = torch.reshape( x,        [-1,1,4] )
+        r   = torch.sqrt(torch.sum( torch.square(x[:,:,1:] - pos), dim=2 ))
+
+        #add r and 1/r for each black hole to see if that accelerates learning
+        x = torch.squeeze(x)
+        x = torch.cat( (x,r,1/r), dim=1 )
+
         x = self.layer1(x)
-        x = torch.cat( (torch.sin(x), torch.cos(x)), dim=1 )
-        
-        x = self.layer2(x)
-        x = torch.cat( (torch.sin(x), torch.cos(x)), dim=1 )
-        
-        x = self.layer3(x)
-        x = torch.reshape(x, [-1,4,4])
-        
+        for layer in self.hidden_layers:
+            x = layer(x) #apply linear layer
+            x = torch.cos(x) #activation function
+            #x = torch.exp( - torch.square(x) )
+        x = self.layer_out(x)
+        #reshape to 4x4 matrices
+        x = torch.reshape( x, [-1, 4, 4] )
         return x
-    
+
     def _init_weights(self):
-        # Initialize weights for layer1
-        init.xavier_uniform_(self.layer1.weight)
-        init.constant_(self.layer1.bias, 0.0)
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.xavier_uniform_(module.weight)
+                nn.init.zeros_(module.bias)
 
-        # Initialize weights for layer2
-        init.xavier_uniform_(self.layer2.weight)
-        init.constant_(self.layer3.bias, 0.0)
-        
-        # Initialize weights for layer3
-        init.xavier_uniform_(self.layer3.weight)
-        init.constant_(self.layer3.bias, 0.0)
- 
 
-class TetradNetwork_V3(nn.Module):
-    '''
-    PURPOSE:
-    Trigonometric Network (https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=eed78c3d057f9be2587c4f6a5e68956974bb5a26)
-    "Iterative Improvement of Trigonometric Networks"
-    '''
-    def __init__(self):
-        super().__init__()
-        L = 8 #number of thetas computed each layer
-        self.layer1  = nn.Linear(      4, L ).to(device) 
-        self.layer2  = nn.Linear(    2*L, L ).to(device)
-        self.layer3  = nn.Linear(    4*L, 16).to(device)
-        self._init_weights()
 
-    def forward(self, x):
-        #forward pass of the neural network
-        x = self.layer1(x)
-        x = torch.cat( (torch.sin(x), torch.cos(x)), dim=1 )
-        
-        x0 = x.clone()
-        x = self.layer2(x)
-        x = torch.cat( (x0, torch.sin(x), torch.cos(x)), dim=1 )
 
-        x = self.layer3(x)
-        x = torch.reshape(x, [-1,4,4])
-        
-        return x
-    
-    def _init_weights(self):
-        # Initialize weights for layer1
-        init.xavier_uniform_(self.layer1.weight)
-        init.constant_(self.layer1.bias, 0.0)
 
-        # Initialize weights for layer2
-        init.constant_(self.layer2.weight, 0.0)
-        init.constant_(self.layer3.bias, 0.0)
-        
-        # Initialize weights for layer3
-        init.xavier_uniform_(self.layer3.weight)
-        init.constant_(self.layer3.bias, 0.0)
+
+
 
 
 
@@ -164,7 +136,7 @@ class MultiBlackHoleNetwork(nn.Module):
             psi = psi + M/2/r
 
         #See if a different slicing induces dynamics
-        e[:,0,0] = 1
+        e[:,0,0] = 1/torch.square(psi) #precollapsed lapse https://journals.aps.org/prl/pdf/10.1103/PhysRevLett.96.111101
         e[:,1,1] = torch.square(psi)
         e[:,2,2] = torch.square(psi)
         e[:,3,3] = torch.square(psi)

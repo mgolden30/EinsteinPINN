@@ -7,22 +7,22 @@ import torch
 
 import torch.optim as optim
 from torch import nn
-from lib.model import TetradNetwork_V1, MultiBlackHoleNetwork
+from lib.model import TetradNetwork_V1, MultiBlackHoleNetwork, TetradNetwork_V2
 from lib.losses import loss_black_hole
 import lib.utils as utils
 import numpy as np
 
 device = utils.check_for_GPU()
 
-output_filename = "./network_output/tetradnet_collision" #utils.save_network will add file extensions for the appropriate output files.
+output_filename = "./network_output/tetradnet_binary" #utils.save_network will add file extensions for the appropriate output files.
 
 #PUT ALL PARAMETERS HERE
-epochs = 8*64 #number of training steps
+epochs = 2*64 #number of training steps
 learning_rate = 1e-2
-num_training  = 1024*2 #number of training points
+num_training  = 1024 #number of training points
 
 #architecture parameters
-num_layers   = 4
+num_layers   = 1
 feature_size = 32
 
 #Seed for reproducibility
@@ -35,14 +35,14 @@ torch.cuda.manual_seed_all(seed)
 #x_test  = utils.sample_uniform_cube( num_training ) #sample from [-1,1]^4
 
 r_min = 0.5 #Don't resolve closer than this to the singularity 
-r_max = 10
-t_max = 5
+r_max = 15
+t_max = 10
 
 #give multiple black hole positions
 pos = np.zeros( (2,3) )
-pos[0,:] = [ 2.0, 0.0, 0.0 ]
-pos[1,:] = [-2.0, 0.0, 0.0 ]
-pos = torch.tensor(pos).to(device)
+pos[0,:] = [ 3.0, 0.0, 0.0 ]
+pos[1,:] = [-3.0, 0.0, 0.0 ]
+pos = torch.tensor(pos, dtype=torch.float32).to(device)
 
 x_train = utils.sample_black_holes(num_training, t_max, r_min, r_max, pos)
 x_test  = utils.sample_black_holes(num_training, t_max, r_min, r_max, pos)
@@ -52,7 +52,7 @@ x0.requires_grad = False
 x0[:,0] = 0 #set t=0 manually
 
 #Create a new network for computing a random tetrad
-tetradnet = TetradNetwork_V1(num_layers, feature_size).to(device)
+tetradnet = TetradNetwork_V2(num_layers, feature_size, pos).to(device)
 schwarz   = MultiBlackHoleNetwork(pos).to(device)
 
 #tetradnet = torch.load("network_output/tetradnet.pth")
